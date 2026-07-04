@@ -7,7 +7,7 @@ from . import ast
 from .diagnostics import Diagnostic, DiagnosticError, Span
 from .lexer import Token, lex
 
-# Binary operator precedence (higher binds tighter).
+# Binary operator precedence; higher binds tighter.
 PRECEDENCE = {
     "||": 1, "&&": 2,
     "==": 3, "!=": 3, "<": 3, "<=": 3, ">": 3, ">=": 3,
@@ -70,7 +70,7 @@ class Parser:
                 if not self.eat_op(","):
                     break
         self.expect("op", ")")
-        # Optional `-> type` is accepted and ignored (types are inferred).
+        # Optional `-> type`, accepted and ignored (types are inferred).
         if self.eat_op("->"):
             self.expect("ident")
         body = self.parse_block()
@@ -112,7 +112,7 @@ class Parser:
             self.expect("op", ";")
             return ast.Join(span, handle)
 
-        # Assignment `name = expr;` vs bare expression statement.
+        # Distinguish `name = expr;` from a bare expression statement.
         if self.at("ident") and self.tokens[self.pos + 1].value == "=" \
                 and self.tokens[self.pos + 1].kind == "op":
             name_tok = self.advance()
@@ -131,7 +131,7 @@ class Parser:
         if mutable:
             self.advance()
         name = self.expect("ident").value
-        # Optional `: type` annotation is accepted and ignored.
+        # Optional `: type`, accepted and ignored.
         if self.eat_op(":"):
             self.expect("ident")
         self.expect("op", "=")

@@ -1,18 +1,16 @@
 """Bounded interleaving model checker.
 
-The `RaceAnalyzer` *proves* race freedom with a type/ownership argument and
-never enumerates schedules. This module is the complementary witness engine:
-it lowers each thread to a sequence of atomic memory operations (with explicit
-lock acquire/release), then does a bounded DFS over all interleavings to either
+`RaceAnalyzer` proves race freedom from types and ownership, without
+enumerating schedules. This is the complementary witness engine: it lowers each
+thread to a sequence of atomic memory ops (with explicit lock acquire/release),
+then runs a bounded DFS over all interleavings to either
 
-  * produce a concrete schedule that exhibits a data race (for rejected
-    programs — great for teaching), or
-  * confirm that, up to the exploration bound, no reachable schedule races.
+  * produce a concrete schedule that races (for rejected programs), or
+  * confirm no reachable schedule races, up to the exploration bound.
 
-Mutual exclusion is modelled honestly: a lock ACQUIRE is only enabled when the
-lock is free, so two threads can never both be inside a critical section. That
-is *why* the mutex pattern is race-free, demonstrated operationally rather than
-asserted.
+A lock ACQUIRE is only enabled when the lock is free, so two threads can never
+both be inside a critical section. That's why the mutex pattern is safe, shown
+operationally instead of asserted.
 """
 from __future__ import annotations
 
@@ -29,7 +27,7 @@ Op = Tuple[str, int, Optional[Span]]
 
 @dataclass
 class Witness:
-    trace: List[str]         # human-readable schedule leading to the race
+    trace: List[str]         # schedule leading to the race
     racing_threads: Tuple[int, int]
     loc: int
     states_explored: int
@@ -47,13 +45,13 @@ class ExploreResult:
 
 
 def lower(analyzer: RaceAnalyzer) -> Dict[int, List[Op]]:
-    """Turn the analyzer's recorded accesses into per-thread op sequences.
+    """Turn recorded accesses into per-thread op sequences.
 
-    Each synchronized access becomes a one-op critical section
-    (ACQ, op, REL); unsynchronized accesses are bare memory ops.
+    A synchronized access becomes a one-op critical section (ACQ, op, REL);
+    an unsynchronized access is a bare memory op.
     """
     threads: Dict[int, List[Op]] = defaultdict(list)
-    for a in analyzer.accesses:  # accesses are already in per-thread order
+    for a in analyzer.accesses:  # already in per-thread order
         kind = "W" if a.write else "R"
         if a.synchronized:
             threads[a.thread].append(("ACQ", a.loc, a.span))
@@ -106,8 +104,8 @@ def explore(analyzer: RaceAnalyzer, max_states: int = 200_000) -> ExploreResult:
 
         locks = dict(locks_fs)
 
-        # --- race detection: two concurrent threads both ready to touch the
-        #     same location with >=1 write and no lock mediating them.
+        # Race: two concurrent threads both ready to touch the same location,
+        # at least one writing, with no lock between them.
         ready_mem: List[Tuple[int, Op]] = []
         for idx, tid in enumerate(tids):
             pc = pcs[idx]
@@ -134,7 +132,7 @@ def explore(analyzer: RaceAnalyzer, max_states: int = 200_000) -> ExploreResult:
                     explored, hit_bound,
                 )
 
-        # --- expand successors (one enabled op from any thread) ---
+        # Expand successors: one enabled op from any thread.
         for idx, tid in enumerate(tids):
             pc = pcs[idx]
             ops = threads[tid]
@@ -144,7 +142,7 @@ def explore(analyzer: RaceAnalyzer, max_states: int = 200_000) -> ExploreResult:
             new_locks = dict(locks)
             if kind == "ACQ":
                 if locks.get(loc, None) not in (None, tid):
-                    continue  # blocked: lock held by another thread
+                    continue  # held by another thread
                 new_locks[loc] = tid
             elif kind == "REL":
                 if locks.get(loc) != tid:

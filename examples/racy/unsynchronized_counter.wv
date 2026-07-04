@@ -1,4 +1,4 @@
-// RACE: `alias` creates an UNSYNCHRONIZED shared handle. Two threads both
+// RACE: `alias` makes an unsynchronized shared handle. Two threads
 // read-modify-write it with no lock. Rejected.
 fn main() {
     let c = cell(0);

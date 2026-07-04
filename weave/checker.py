@@ -1,23 +1,22 @@
-"""The Weave checker: proves data-race freedom (or explains why it can't).
+"""The checker: proves data-race freedom, or explains why it can't.
 
-Two cooperating analyses run over each function:
+Two analyses run over each function:
 
   A. Type + ownership/borrow checking (`OwnershipChecker`)
      - infers types, validates built-ins
-     - tracks move semantics for non-`Copy` values and reports use-after-move
-     - enforces mutability (`mut`) for writes
+     - tracks moves for non-`Copy` values and reports use-after-move
+     - enforces `mut` for writes
 
   B. Thread-escape race analysis (`RaceAnalyzer`)
-     - assigns every heap object a location id
+     - gives every heap object a location id
      - builds the spawn/join thread tree and a "can-run-concurrently" relation
      - flags any location touched by two concurrent threads with >=1 write and
-       no common lock held  ->  a data race
+       no common lock held
 
-The type system is designed so that the ONLY way to share mutable state across
-threads without a race is `mutex` + `share` + `lock`. `alias` deliberately
-exposes an *unsynchronized* shared handle (like `Rc`): legal single-threaded,
-rejected the moment two concurrent threads touch it. That mirrors how real
-ownership systems make races unrepresentable rather than merely unlikely.
+The only race-free way to share mutable state across threads is
+`mutex` + `share` + `lock`. `alias` gives an unsynchronized shared handle (like
+`Rc`): fine single-threaded, rejected as soon as two concurrent threads touch
+it.
 """
 from __future__ import annotations
 
@@ -34,14 +33,14 @@ INT = "int"
 BOOL = "bool"
 UNIT = "unit"
 CELL = "cell"            # Cell<int>: owned, mutable, non-Copy
-SHARED_CELL = "sharedcell"   # Arc<Cell>: shared, UNSYNCHRONIZED (footgun)
+SHARED_CELL = "sharedcell"   # Arc<Cell>: shared, unsynchronized
 MUTEX = "mutex"          # Mutex<int>: owned, non-Copy
 SHARED = "shared"        # Arc<Mutex<int>>: shared, synchronized
 HANDLE = "handle"        # thread handle from spawn
 UNKNOWN = "unknown"
 
 COPY_TYPES = {INT, BOOL, UNIT, UNKNOWN}
-# Handles that are cloned (not moved) when captured by a thread:
+# Handles cloned (not moved) when captured by a thread:
 CLONEABLE = {SHARED_CELL, SHARED}
 
 
@@ -100,7 +99,7 @@ class OwnershipChecker:
                          stmt.span,
                          help=f"declare it with `let mut {stmt.name} = ...`")
             self.eval_expr(stmt.value, env)
-            info.moved_at = None  # reassignment revives the binding
+            info.moved_at = None  # reassignment revives it
         elif isinstance(stmt, ast.ExprStmt):
             self.eval_expr(stmt.expr, env)
         elif isinstance(stmt, ast.Return):
@@ -122,7 +121,7 @@ class OwnershipChecker:
                          stmt.span,
                          help="create one with `mutex(0)` then `share(m)`")
             child = dict(env)
-            # The guard is an exclusive, mutable view of the protected int.
+            # The guard is an exclusive, mutable view of the guarded int.
             child[stmt.guard] = VarInfo(INT, True)
             self.check_block(stmt.body, child)
         elif isinstance(stmt, ast.Join):
@@ -168,14 +167,14 @@ class OwnershipChecker:
                           "thread, or share it with `mutex`+`share`.",
                      notes=[f"{e.ident!r} was moved at line {info.moved_at.line}"])
             return info.ty
-        # Reading a non-Copy value by *value* moves it.
+        # Reading a non-Copy value by value moves it.
         if move and not is_copy(info.ty):
             info.moved_at = e.span
         return info.ty
 
     def eval_call(self, e: ast.Call, env: Dict[str, VarInfo]) -> str:
         name = e.callee
-        # Built-ins with custom ownership behaviour.
+        # Built-ins with custom ownership behavior.
         if name == "cell":
             self.expect_args(e, 1); self.expect_int(e.args, 0, env)
             return CELL
@@ -210,7 +209,7 @@ class OwnershipChecker:
             for a in e.args:
                 self.eval_expr(a, env)
             return UNIT
-        # User-defined function: arguments are moved/copied as usual.
+        # User function: args are moved/copied as usual.
         if name in self.fns:
             for a in e.args:
                 self.eval_expr(a, env)
@@ -221,8 +220,8 @@ class OwnershipChecker:
         return UNKNOWN
 
     def eval_spawn(self, e: ast.SpawnExpr, env: Dict[str, VarInfo]):
-        # Capture analysis: non-Copy, non-cloneable values (cells / mutexes)
-        # are MOVED into the thread; shared handles are cloned; scalars copied.
+        # Capture: cells and mutexes are moved into the thread; shared handles
+        # are cloned; scalars copied.
         captured = collect_names(e.body)
         child = dict(env)
         for name in captured:
@@ -232,7 +231,7 @@ class OwnershipChecker:
             if info.ty in CLONEABLE or is_copy(info.ty):
                 child[name] = VarInfo(info.ty, info.mutable)  # clone / copy
             else:
-                # Move into the thread: the parent loses ownership here.
+                # Move into the thread; parent loses ownership.
                 child[name] = VarInfo(info.ty, info.mutable)
                 info.moved_at = e.span
         self.check_block(e.body, child)
@@ -259,7 +258,7 @@ class OwnershipChecker:
 
     def expect_container(self, call: ast.Call, arg: ast.Expr, env,
                          allowed: Set[str], write: bool):
-        """`get`/`set`/`load` BORROW their container (no move)."""
+        """`get`/`set`/`load` borrow their container (no move)."""
         if isinstance(arg, ast.Name):
             ty = self.read_name(arg, env, move=False)
             info = env.get(arg.ident)
@@ -281,10 +280,10 @@ class OwnershipChecker:
 
 
 def collect_names(node) -> Set[str]:
-    """Free-ish variable names referenced anywhere under `node`.
+    """Variable names referenced anywhere under `node`.
 
-    Conservative (ignores shadowing) — good enough for capture analysis in the
-    small Weave language, where inner `let`s rarely shadow captured handles.
+    Ignores shadowing, which is fine for capture analysis here: inner `let`s
+    rarely shadow captured handles.
     """
     names: Set[str] = set()
 
@@ -333,7 +332,7 @@ class Access:
 
 @dataclass
 class Group:
-    """A spawned thread and every thread beneath it (its subtree)."""
+    """A spawned thread and its subtree."""
     root: int
     handle: Optional[str]
     members: Set[int]
@@ -376,8 +375,8 @@ class RaceAnalyzer:
     # -- traversal ----------------------------------------------------------
     def analyze_block(self, block: ast.Block, tid: int,
                       env: Dict[str, LocRef]) -> Set[int]:
-        """Analyze a block executed by `tid`. Returns the set of thread ids
-        created anywhere within it (its descendants)."""
+        """Analyze a block run by `tid`. Returns the thread ids created
+        within it (its descendants)."""
         created: Set[int] = set()
         active: List[Group] = []  # child groups spawned here, not yet joined
 
@@ -394,8 +393,8 @@ class RaceAnalyzer:
         if isinstance(stmt, ast.Let):
             ref = self.eval_ref(stmt.value, tid, env, active, created, record)
             if isinstance(stmt.value, ast.SpawnExpr):
-                # `let h = spawn { .. }` — the spawn already registered a group;
-                # tag the most recent group with this handle name.
+                # `let h = spawn { .. }`: the spawn already made a group; tag
+                # the most recent one with this handle name.
                 if active and active[-1].handle is None:
                     active[-1].handle = stmt.name
             if ref is not None:
@@ -403,7 +402,7 @@ class RaceAnalyzer:
             elif stmt.name in env:
                 del env[stmt.name]
         elif isinstance(stmt, ast.Assign):
-            # Assigning to a lock guard is a synchronized write.
+            # Assigning through a lock guard is a synchronized write.
             info = env.get(stmt.name)
             if info is not None and info.kind == "guard":
                 record(info.loc, True, True, stmt.span, "write")
@@ -434,13 +433,13 @@ class RaceAnalyzer:
                 hname = stmt.handle.ident
                 for i, g in enumerate(active):
                     if g.handle == hname:
-                        active.pop(i)  # joined => no longer concurrent
+                        active.pop(i)  # joined, no longer concurrent
                         break
 
     def eval_ref(self, e, tid, env, active, created,
                  record) -> Optional[LocRef]:
-        """Evaluate an expression for its side effects (accesses / spawns) and
-        return a LocRef if it denotes a heap location."""
+        """Evaluate an expression for its side effects (accesses, spawns),
+        returning a LocRef if it denotes a heap location."""
         if isinstance(e, ast.SpawnExpr):
             child = self.new_tid()
             child_env = dict(env)  # capture
@@ -455,7 +454,7 @@ class RaceAnalyzer:
             return self.eval_call_ref(e, tid, env, record)
         if isinstance(e, ast.Name):
             return env.get(e.ident)
-        # Any other expression: still walk it for nested accesses.
+        # Anything else: walk it for nested accesses.
         self.walk_expr(e, tid, env, record)
         return None
 
@@ -500,7 +499,7 @@ class RaceAnalyzer:
             self.walk_expr(a, tid, env, record)
 
     def walk_expr(self, e, tid, env, record):
-        """Walk an expression recording memory accesses (get/set/load and
+        """Walk an expression, recording memory accesses (get/set/load and
         reads of a lock guard)."""
         if isinstance(e, ast.Name):
             info = env.get(e.ident)
@@ -514,7 +513,7 @@ class RaceAnalyzer:
         elif isinstance(e, ast.Unary):
             self.walk_expr(e.operand, tid, env, record)
         elif isinstance(e, ast.SpawnExpr):
-            # A spawn in raw expression position (unusual) — analyze its body.
+            # Spawn in raw expression position (unusual); analyze its body.
             child = self.new_tid()
             self.analyze_block(e.body, child, dict(env))
 
@@ -523,7 +522,7 @@ class RaceAnalyzer:
             return env.get(e.ident)
         return None
 
-    # -- the actual race check ---------------------------------------------
+    # -- the race check ----------------------------------------------------
     def detect_races(self):
         by_loc: Dict[int, List[Access]] = defaultdict(list)
         for a in self.accesses:
@@ -540,13 +539,12 @@ class RaceAnalyzer:
                         continue
                     if not (a.write or b.write):
                         continue  # read/read never races
-                    # A common lock is held iff BOTH accesses are synchronized
-                    # (the mutex protecting `loc` is the shared lock).
+                    # A common lock is held iff both accesses are synchronized.
                     if a.synchronized and b.synchronized:
                         continue
-                    # One diagnostic per (location, pair-of-threads): a
-                    # read/write and write/write conflict on the same value
-                    # between the same two threads is one race, not two.
+                    # One diagnostic per (location, thread-pair): conflicting
+                    # accesses on the same value between the same threads are
+                    # one race, not several.
                     key = (loc, frozenset((a.thread, b.thread)))
                     if key in reported:
                         continue
@@ -599,6 +597,6 @@ def check_program(program: ast.Program) -> CheckResult:
     diags: List[Diagnostic] = []
     diags.extend(OwnershipChecker(program).check())
     diags.extend(RaceAnalyzer().analyze(program))
-    # Stable ordering by source position for deterministic output.
+    # Sort by source position for deterministic output.
     diags.sort(key=lambda d: (d.span.line, d.span.col))
     return CheckResult(diags)

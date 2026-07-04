@@ -1,7 +1,7 @@
-"""Hand-written lexer for Weave.
+"""Hand-written lexer.
 
-Produces a flat token stream with source spans. Kept deliberately small: the
-interesting engineering in this project is the checker, not the front end.
+Produces a flat token stream with source spans. Kept small on purpose; the
+real work in this project is the checker, not the front end.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ KEYWORDS = {
     "if", "else", "while", "return", "true", "false",
 }
 
-# Two-char operators must be tried before their one-char prefixes.
+# Try two-char operators before their one-char prefixes.
 TWO_CHAR = {"==", "!=", "<=", ">=", "&&", "||", "->"}
 ONE_CHAR = set("(){};,:=<>+-*/!&")
 

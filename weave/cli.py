@@ -4,7 +4,7 @@
     weave check <file.wv> -v     # also run the interleaving model checker
     weave explain <file.wv>      # show a concrete racy schedule, if any
 
-The exit code is the contract: 0 means "compiled, provably race-free".
+Exit code 0 means "compiled, provably race-free".
 """
 from __future__ import annotations
 
@@ -52,14 +52,14 @@ def cmd_check(args) -> int:
                      RED, color))
         return 1
 
-    # Optional second opinion from the interleaving model checker.
+    # Optional cross-check with the interleaving model checker.
     verify_note = ""
     if args.verify and result.program is not None:
         analyzer = RaceAnalyzer()
         analyzer.analyze(result.program)
         res = explore(analyzer)
         if res.witness is not None:
-            # Should never happen if both engines agree; surface loudly.
+            # Shouldn't happen if the two engines agree; surface it loudly.
             print(_color("internal disagreement: model checker found a race "
                          "the type system missed:", RED, color))
             for line in res.witness.trace:

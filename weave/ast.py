@@ -1,8 +1,8 @@
 """Weave AST.
 
-Nodes are plain dataclasses carrying a `span` for diagnostics. Expressions and
-statements are kept separate. Concurrency primitives (`spawn`, `lock`, `join`)
-are first-class so the checker can reason about them structurally.
+Nodes are dataclasses carrying a `span` for diagnostics. Expressions and
+statements are separate. The concurrency primitives (`spawn`, `lock`, `join`)
+are first-class nodes so the checker can reason about them structurally.
 """
 from __future__ import annotations
 
@@ -49,15 +49,15 @@ class Binary(Expr):
 
 @dataclass
 class Call(Expr):
-    """Function / builtin call: mutex(x), cell(x), share(m), alias(c),
-    get(c), set(c, v), load(s), print(x), or a user fn."""
+    """A call: builtin (mutex, cell, share, alias, get, set, load, print)
+    or a user-defined function."""
     callee: str
     args: List[Expr]
 
 
 @dataclass
 class SpawnExpr(Expr):
-    """`spawn { ... }` — evaluates to a thread Handle."""
+    """`spawn { ... }` — evaluates to a thread handle."""
     body: "Block"
 
 
@@ -107,7 +107,7 @@ class While(Stmt):
 @dataclass
 class Lock(Stmt):
     """`lock <target> as <guard> { body }` — exclusive access to the guarded
-    value for the duration of `body`, bound to `guard`."""
+    value inside `body`, bound to `guard`."""
     target: Expr
     guard: str
     body: "Block"

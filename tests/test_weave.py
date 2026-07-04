@@ -1,7 +1,6 @@
 """Test suite for the Weave data-race compiler.
 
-Runs with the stdlib test runner (`python3 -m unittest`) — no third-party
-dependencies — and also under pytest if available.
+Runs under `python3 -m unittest` (no third-party deps) or pytest.
 """
 from __future__ import annotations
 
@@ -90,7 +89,7 @@ class SafeProgramTests(unittest.TestCase):
         self.assertTrue(compile_source(src).ok)
 
     def test_sequential_reuse_after_join_is_fine(self):
-        # Accessing shared state AFTER a join is not concurrent -> no race.
+        # Access after a join isn't concurrent, so no race.
         src = """
         fn main() {
             let c = cell(0);
@@ -202,8 +201,8 @@ class InterleavingTests(unittest.TestCase):
 
 
 class EngineAgreementTests(unittest.TestCase):
-    """The type-system prover and the interleaving checker must never
-    disagree on any example shipped in the repo."""
+    """The prover and the interleaving checker must never disagree on any
+    example in the repo."""
 
     def _examples(self, subdir):
         return sorted(glob.glob(os.path.join(ROOT, "examples", subdir, "*.wv")))
@@ -221,8 +220,8 @@ class EngineAgreementTests(unittest.TestCase):
                 res = explore(a)
                 has_race_diag = any(
                     d.kind == "data-race" for d in result.diagnostics)
-                # If the type system flags a race, the model checker must find
-                # a witness. If it proves safety, no witness may exist.
+                # Flagged race => the model checker must find a witness.
+                # Proven safe => no witness may exist.
                 if has_race_diag:
                     self.assertIsNotNone(
                         res.witness, f"{path}: prover says race, MC disagrees")

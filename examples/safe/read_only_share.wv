@@ -1,5 +1,5 @@
 // SAFE: an unsynchronized shared handle is fine as long as nobody writes.
-// Many readers, zero writers => no data race. Compiles.
+// Many readers, no writers, no race. Compiles.
 fn main() {
     let c = cell(7);
     let s = alias(c);

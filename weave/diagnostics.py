@@ -1,8 +1,7 @@
-"""Source positions and human-friendly diagnostics.
+"""Source positions and diagnostics.
 
-Every error the compiler emits is a `Diagnostic`: a category, a primary
-message, the source span it points at, and — crucially for this project — an
-optional `help` that guides the programmer toward a race-free pattern.
+Every compiler error is a `Diagnostic`: a category, a message, the span it
+points at, and an optional `help` suggesting a race-free pattern.
 """
 from __future__ import annotations
 
@@ -12,7 +11,7 @@ from typing import List, Optional
 
 @dataclass(frozen=True)
 class Span:
-    """A half-open [start, end) region of a single source line (1-based)."""
+    """A region on one source line, 1-based."""
     line: int
     col: int
     length: int = 1
@@ -23,7 +22,7 @@ class Span:
 
 
 class DiagnosticError(Exception):
-    """Raised to abort a compilation phase with one fatal diagnostic."""
+    """Aborts a compilation phase with one fatal diagnostic."""
 
     def __init__(self, diag: "Diagnostic"):
         super().__init__(diag.message)

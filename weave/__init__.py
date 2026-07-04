@@ -1,9 +1,9 @@
-"""Weave — a compiler front end that proves data-race freedom.
+"""Weave: a compiler front end that proves data-race freedom.
 
 Public API:
     parse(source)            -> ast.Program
     check_program(program)   -> CheckResult
-    compile_source(source)   -> CompileResult   (parse + check, one call)
+    compile_source(source)   -> CompileResult   (parse + check in one call)
 """
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ class CompileResult:
 
 
 def compile_source(source: str) -> CompileResult:
-    """Parse and check a Weave source string. Never raises for user errors —
-    parse/lex failures are returned as diagnostics like everything else."""
+    """Parse and check a source string. User errors (including lex/parse
+    failures) come back as diagnostics; this never raises for them."""
     try:
         program = parse(source)
     except DiagnosticError as e:
