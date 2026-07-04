@@ -1,0 +1,10 @@
+// OWNERSHIP ERROR (which is exactly how the race is prevented): the cell is
+// moved into the thread, then used again by the parent. Rejected.
+fn main() {
+    let mut c = cell(0);
+    let h = spawn {
+        set(c, 1);
+    };
+    print(get(c));    // c no longer belongs to this thread
+    join(h);
+}

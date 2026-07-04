@@ -1,0 +1,11 @@
+// RACE: `alias` creates an UNSYNCHRONIZED shared handle. Two threads both
+// read-modify-write it with no lock. Rejected.
+fn main() {
+    let c = cell(0);
+    let mut s = alias(c);
+    let h1 = spawn { set(s, get(s) + 1); };
+    let h2 = spawn { set(s, get(s) + 1); };
+    join(h1);
+    join(h2);
+    print(get(s));
+}

@@ -1,0 +1,11 @@
+// SAFE: the cell is MOVED into the thread, giving it a single owner. No other
+// thread can touch it, so no synchronization is needed. Compiles.
+fn main() {
+    let mut c = cell(0);
+    let h = spawn {
+        set(c, 42);
+        print(get(c));
+    };
+    join(h);
+    // Touching `c` here would be a use-after-move error: the thread owns it.
+}

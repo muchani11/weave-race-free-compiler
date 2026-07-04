@@ -1,0 +1,11 @@
+// RACE: the parent writes the shared value while the child is still running
+// (before the join). Rejected.
+fn main() {
+    let c = cell(0);
+    let mut s = alias(c);
+    let h = spawn {
+        set(s, 1);
+    };
+    set(s, 2);        // concurrent with the child thread's write above
+    join(h);
+}

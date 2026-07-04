@@ -1,0 +1,10 @@
+// SAFE: an unsynchronized shared handle is fine as long as nobody writes.
+// Many readers, zero writers => no data race. Compiles.
+fn main() {
+    let c = cell(7);
+    let s = alias(c);
+    let h1 = spawn { print(get(s)); };
+    let h2 = spawn { print(get(s)); };
+    join(h1);
+    join(h2);
+}

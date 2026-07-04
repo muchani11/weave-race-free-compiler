@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weave-lang"
+version = "0.1.0"
+description = "A compiler front end that only compiles code it can prove is free of data races."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["compiler", "concurrency", "data-race", "ownership", "borrow-checker", "static-analysis"]
+
+[project.scripts]
+weave = "weave.cli:main"
+
+[tool.setuptools]
+packages = ["weave"]
+
+[tool.setuptools.package-data]
+weave = ["py.typed"]

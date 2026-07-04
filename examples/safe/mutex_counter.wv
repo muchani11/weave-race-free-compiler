@@ -1,0 +1,17 @@
+// SAFE: two threads increment a shared counter, but every access is behind a
+// mutex, so the two writes can never overlap. Compiles.
+fn main() {
+    let m = mutex(0);
+    let s = share(m);              // move the mutex into a shareable handle
+
+    let h1 = spawn {
+        lock s as g { g = g + 1; }
+    };
+    let h2 = spawn {
+        lock s as g { g = g + 1; }
+    };
+
+    join(h1);
+    join(h2);
+    print(load(s));                // safe: parent reads only after both joins
+}
