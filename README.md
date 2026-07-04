@@ -201,5 +201,3 @@ weave/
 examples/          safe/ (compile) and racy/ (rejected)
 tests/             unittest suite incl. cross-engine agreement
 ```
-
-MIT licensed.
